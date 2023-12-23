@@ -1,22 +1,26 @@
+#!/usr/bin/env python
 '''
 Created on 12 Oct 2011
 
 @author: chris.whitworth
 '''
+import os
 import sys
-import CPU.Memory as Memory
-import CPU.Registers as Registers
-import CPU.AddressDispatcher as AddressDispatcher
-import CPU.Writeback as Writeback
-import CPU.ExecutionUnit as ExecutionUnit
-import CPU.Dispatch as Dispatch
-import CPU.InstructionDecoder as Decoder
-import Debugging.Combiner
-import Debugging.Writeback
-import Debugging.ExecutionUnit
-import BBCMicro.System
+import pybeeb.CPU.Memory as Memory
+import pybeeb.CPU.Registers as Registers
+import pybeeb.CPU.AddressDispatcher as AddressDispatcher
+import pybeeb.CPU.Writeback as Writeback
+import pybeeb.CPU.ExecutionUnit as ExecutionUnit
+import pybeeb.CPU.Dispatch as Dispatch
+import pybeeb.CPU.InstructionDecoder as Decoder
+import pybeeb.Debugging.Combiner
+import pybeeb.Debugging.Writeback
+import pybeeb.Debugging.ExecutionUnit
+import pybeeb.BBCMicro.System
+import pybeeb
 
-DecodeFilename = "insts.csv"
+DecodeFilename = os.path.join(os.path.dirname(pybeeb.__file__), "insts.csv")
+
 
 class BBC(object):
     def __init__(self, pcTrace = False, verbose = False):
@@ -25,12 +29,12 @@ class BBC(object):
         addrDispatch = AddressDispatcher.AddressDispatcher(self.mem, self.reg)
 
         execDispatch = ExecutionUnit.ExecutionDispatcher(self.mem,self.reg)
-        execLogger = Debugging.ExecutionUnit.LoggingExecutionUnit()
-        combinedExec = Debugging.Combiner.Dispatcher( (execLogger, execDispatch) )
+        execLogger = pybeeb.Debugging.ExecutionUnit.LoggingExecutionUnit()
+        combinedExec = pybeeb.Debugging.Combiner.Dispatcher( (execLogger, execDispatch) )
 
         writebackDispatch = Writeback.Dispatcher(self.mem,self.reg)
-        writebackLogger = Debugging.Writeback.LoggingDispatcher()
-        combinedWriteback = Debugging.Combiner.Dispatcher( (writebackLogger, writebackDispatch) )
+        writebackLogger = pybeeb.Debugging.Writeback.LoggingDispatcher()
+        combinedWriteback = pybeeb.Debugging.Combiner.Dispatcher( (writebackLogger, writebackDispatch) )
 
         decoder = Decoder.Decoder(DecodeFilename)
 
@@ -47,10 +51,12 @@ class BBC(object):
                                            execDispatch, writebackDispatch,
                                            self.mem, self.reg)
 
-        self.bbc = BBCMicro.System.Beeb(dispatch)
+        self.bbc = pybeeb.BBCMicro.System.Beeb(dispatch)
 
     def go(self, syscalls):
         instr = 0
+        # NOTE: We only support a single handler per address.
+        syscalls = dict(syscalls)
 
         while True:
             if self.pcTrace:
@@ -67,12 +73,12 @@ class BBC(object):
                 self.reg.status()
 
 def OS_WRCH(reg,mem): sys.stdout.write(chr(reg.a))
-def OS_RDCH(reg,mem): print "OS_RDCH" # Could inject keypresses here maybe?
+def OS_RDCH(reg,mem): print("OS_RDCH") # Could inject keypresses here maybe?
 
 if __name__ == "__main__":
     OS_WRCH_LOC = 0xe0a4
     OS_RDCH_LOC = 0xdec5
-    syscalls = { OS_WRCH_LOC : OS_WRCH,
-                 OS_RDCH_LOC : OS_RDCH }
+    syscalls = [ (OS_WRCH_LOC, OS_WRCH),
+                 (OS_RDCH_LOC, OS_RDCH) ]
     bbc = BBC()
     bbc.go(syscalls)
